@@ -1,5 +1,5 @@
 clear;
-
+%% 명령창에 붙여넣어서 패킷 생성 주기의 분포를 볼 수 있는 코드
 %% 원하는 파일로 변경
 %load('RMRPolicy_fixedCPM_frequency_th5.mat');
 load('RMRPolicy_fixedCPM_distance_th5.mat');
