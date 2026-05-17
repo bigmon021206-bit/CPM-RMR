@@ -1,49 +1,68 @@
-clear;
-%% 명령창에 붙여넣어서 패킷 생성 주기의 분포를 볼 수 있는 코드
-%% 원하는 파일로 변경
-load('RMRPolicy_fixedCPM_frequency_th70.mat');
-% load('RMRPolicy_fixedCPM_distance_th25.mat');
+clear; clc;
+
+%% ===== 파일 설정 =====
+files = {
+    'RMRPolicy_fixedCPM_none_th0.mat',      'No RMR';
+    'RMRPolicy_fixedCPM_frequency_th120.mat',  'N=120';
+    'RMRPolicy_fixedCPM_frequency_th60.mat',  'N=60';
+    'RMRPolicy_fixedCPM_frequency_th10.mat', 'N=10'
+};
 
 dt = 0.1;
-flag = RMRPolicy.RMRGenerateFlag;
 
-allIntervals = [];
+minStep = 1;   % 0.1s
+maxStep = 10;  % 1.0s
 
-for tx = 1:size(flag,1)
-    txSteps = find(flag(tx,:) == 1);
+intervalSteps = minStep:maxStep;
+intervalSec = intervalSteps * dt;
 
-    if numel(txSteps) >= 2
-        intervals = diff(txSteps(:)) * dt;
-        allIntervals = [allIntervals; intervals];
+ratioMat = zeros(length(files), length(intervalSteps));
+
+%% ===== 각 케이스별 반복 =====
+for fIdx = 1:size(files,1)
+
+    load(files{fIdx,1});  % RMRPolicy 로드
+    flag = RMRPolicy.RMRGenerateFlag;
+
+    allIntervals = [];
+
+    for tx = 1:size(flag,1)
+        txSteps = find(flag(tx,:) == 1);
+
+        if numel(txSteps) >= 2
+            intervals = diff(txSteps(:)); % step 단위
+            allIntervals = [allIntervals; intervals];
+        end
     end
+
+    %% ===== 0.1~1.0초만 필터 =====
+    allIntervals = allIntervals( ...
+        allIntervals >= minStep & ...
+        allIntervals <= maxStep);
+
+    %% ===== count & ratio =====
+    count = zeros(size(intervalSteps));
+
+    for i = 1:length(intervalSteps)
+        count(i) = sum(allIntervals == intervalSteps(i));
+    end
+
+    ratio = count / sum(count);
+
+    ratioMat(fIdx,:) = ratio;
 end
 
-allIntervals = round(allIntervals, 2);
-
-%% 0.1~1.0초 전체 보기
+%% ===== Plot =====
 figure;
-
-edges = 0.05:0.1:1.05;   % 1.0초가 마지막 bin 중앙에 들어가도록 설정
-
-histogram(allIntervals, ...
-    'BinEdges', edges, ...
-    'FaceAlpha', 0.85, ...
-    'LineWidth', 1.5);
+bar(intervalSec*1000, ratioMat' * 100);  % ms, %
 
 grid on;
-xlabel('Transmission Interval [s]');
-ylabel('Count');
-title('Transmission Interval Distribution');
+xlabel('CPM Generation Interval [ms]');
+ylabel('Ratio [%]');
+title('CPM Generation Interval Ratio Comparison');
 
-xlim([0.05 1.05]);
-xticks(0.1:0.1:1.0);
+xticks(100:100:1000);
+xlim([50 1050]);
+ylim([0 100]);
 
-fprintf('\n===== Interval Statistics =====\n');
-fprintf('Total interval samples = %d\n', length(allIntervals));
-fprintf('Mean interval   = %.4f s\n', mean(allIntervals));
-fprintf('Median interval = %.4f s\n', median(allIntervals));
-fprintf('Min interval    = %.4f s\n', min(allIntervals));
-fprintf('Max interval    = %.4f s\n', max(allIntervals));
-
-disp('Unique intervals:');
-disp(unique(allIntervals));
+legend(files(:,2), 'Location', 'best');
